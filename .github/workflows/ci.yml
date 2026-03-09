@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate Python syntax
+        run: |
+          python -m py_compile worker/provision_free_tier_retry.py
+
+      - name: Validate shell entrypoint syntax
+        run: |
+          bash -n worker/entrypoint.sh
+
+      - name: Validate Docker Compose config
+        run: |
+          cp .env.example .env
+          docker compose config >/dev/null
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build -t oci-freetier-docker-capacity-watch:ci .
