@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   tag-and-release:
@@ -29,3 +30,11 @@ jobs:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: ${{ steps.tag.outputs.tag }}
           generate_release_notes: true
+
+      - name: Trigger release image workflow for this tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run release-image.yml \
+            --repo "${{ github.repository }}" \
+            --ref "${{ steps.tag.outputs.tag }}"
