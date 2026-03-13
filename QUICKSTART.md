@@ -13,8 +13,8 @@ Edit `.env`:
 - `OCI_PROFILE` to your profile name in mounted `.oci/config`
 - `WATCHER_IMAGE` to the image tag you want (default points to GHCR release)
 - `CONTAINER_USER`:
-  - keep `0` for maximum compatibility with strict `.oci` file permissions
-  - set non-root uid:gid only if mounted files are readable by that user
+  - default `1000:1000` is recommended for Unraid/userns setups
+  - if credentials are unreadable, adjust uid:gid to match mounted file ownership
 - `OCI_MOUNT_DIR` to host directory containing `.oci/config` and key files
 - `SSH_PUBLIC_KEY_FILE` to host public key path
 - `PROFILE_DEFAULTS_FILE` to host path for the shared profile JSON

@@ -50,6 +50,12 @@ Important: if host root is compromised, mounted credentials can still be exfiltr
 - `unraid` (mount and call Unraid notify binary)
 - `webhook` (HTTP POST)
 
+## Image tags
+
+- Release workflow creates immutable tags in the format `vYYYY.MM.DD.N`.
+- Image workflow publishes `ghcr.io/syscode-labs/oci-free-tier-docker-capacity-watch:<tag>` for each release tag.
+- `latest` is also published for convenience, but production use should pin an immutable `v...` tag.
+
 ## Files
 
 - `docker-compose.yml`
