@@ -323,6 +323,8 @@ class OciCli:
             raise OciCliError(f"Unsupported OCI command mapping: {' '.join(args)}")
         except ServiceError as exc:
             message = exc.message or str(exc)
+            if exc.code:
+                message = f"{exc.code}: {message}"
             raise OciCliError(message) from exc
         except OciCliError:
             raise
@@ -335,12 +337,54 @@ CAPACITY_PATTERNS = [
     "out of host capacity",
     "Out of capacity",
     "OutOfHostCapacity",
+]
+
+THROTTLE_PATTERNS = [
+    "TooManyRequests",
+    "429",
+    "throttl",
+    "rate limit",
+]
+
+TRANSIENT_PATTERNS = [
+    "ServiceUnavailable",
+    "InternalError",
+    "GatewayTimeout",
+    "timeout",
+    "temporar",
+]
+
+AUTH_PATTERNS = [
+    "NotAuthenticated",
+    "NotAuthorized",
+    "Unauthorized",
+    "Forbidden",
+]
+
+QUOTA_PATTERNS = [
     "LimitExceeded",
+    "QuotaExceeded",
+    "OutOfQuota",
 ]
 
 
 def is_capacity_error(error_text: str) -> bool:
     return any(pat in error_text for pat in CAPACITY_PATTERNS)
+
+
+def classify_oci_error(error_text: str) -> str:
+    lowered = error_text.lower()
+    if any(pat.lower() in lowered for pat in CAPACITY_PATTERNS):
+        return "capacity"
+    if any(pat.lower() in lowered for pat in THROTTLE_PATTERNS):
+        return "throttle"
+    if any(pat.lower() in lowered for pat in TRANSIENT_PATTERNS):
+        return "transient"
+    if any(pat.lower() in lowered for pat in AUTH_PATTERNS):
+        return "auth"
+    if any(pat.lower() in lowered for pat in QUOTA_PATTERNS):
+        return "quota"
+    return "other"
 
 
 def read_profile_values(profile: str) -> dict[str, str]:
@@ -810,19 +854,26 @@ def capacity_available(
             "memory-in-gbs": probe_memory,
         }
 
-    report = oci.run(
-        [
-            "compute",
-            "compute-capacity-report",
-            "create",
-            "--availability-domain",
-            availability_domain,
-            "--compartment-id",
-            tenancy_ocid,
-            "--shape-availabilities",
-            json.dumps([shape_availability]),
-        ]
-    )
+    try:
+        report = oci.run(
+            [
+                "compute",
+                "compute-capacity-report",
+                "create",
+                "--availability-domain",
+                availability_domain,
+                "--compartment-id",
+                tenancy_ocid,
+                "--shape-availabilities",
+                json.dumps([shape_availability]),
+            ]
+        )
+    except OciCliError as exc:
+        category = classify_oci_error(str(exc))
+        log(f"Capacity probe failed for {shape} in {availability_domain} [{category}]: {exc}")
+        if category in {"capacity", "throttle", "transient"}:
+            return False
+        raise
     entries = report.get("data", {}).get("shape-availabilities", [])
     if not entries:
         return False
@@ -989,9 +1040,10 @@ def main() -> int:
             if ok:
                 log(f"Launched {name}: {detail}")
             else:
-                log(f"Launch failed for {name}: {detail}")
-                if not is_capacity_error(detail):
-                    raise RuntimeError(f"Non-capacity error launching {name}: {detail}")
+                category = classify_oci_error(detail)
+                log(f"Launch failed for {name} [{category}]: {detail}")
+                if category not in {"capacity", "throttle", "transient"}:
+                    raise RuntimeError(f"{category} error launching {name}: {detail}")
 
         for idx in range(len(existing_ampere), ampere_target):
             name = f"ampere-instance-{idx + 1}"
@@ -1024,9 +1076,10 @@ def main() -> int:
             if ok:
                 log(f"Launched {name}: {detail}")
             else:
-                log(f"Launch failed for {name}: {detail}")
-                if not is_capacity_error(detail):
-                    raise RuntimeError(f"Non-capacity error launching {name}: {detail}")
+                category = classify_oci_error(detail)
+                log(f"Launch failed for {name} [{category}]: {detail}")
+                if category not in {"capacity", "throttle", "transient"}:
+                    raise RuntimeError(f"{category} error launching {name}: {detail}")
 
         existing_ampere = list_existing_instances(oci, compartment_id, "ampere-instance-", "VM.Standard.A1.Flex")
         existing_micro = list_existing_instances(oci, compartment_id, "micro-instance-", "VM.Standard.E2.1.Micro")

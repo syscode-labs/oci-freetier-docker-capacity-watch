@@ -49,6 +49,15 @@ def test_is_capacity_error_matches_known_patterns() -> None:
     assert not mod.is_capacity_error("Some unrelated error")
 
 
+def test_classify_oci_error_categories() -> None:
+    assert mod.classify_oci_error("OutOfHostCapacity on AD-1") == "capacity"
+    assert mod.classify_oci_error("TooManyRequests: rate limit exceeded") == "throttle"
+    assert mod.classify_oci_error("ServiceUnavailable temporary backend issue") == "transient"
+    assert mod.classify_oci_error("NotAuthorizedOrNotFound") == "auth"
+    assert mod.classify_oci_error("LimitExceeded for service quota") == "quota"
+    assert mod.classify_oci_error("UnknownFailure random") == "other"
+
+
 class _FakeIdentityClient:
     def list_compartments(self, **kwargs):  # noqa: ANN003
         assert kwargs["compartment_id"] == "ocid1.tenancy.oc1..example"
