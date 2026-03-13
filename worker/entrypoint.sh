@@ -63,7 +63,7 @@ python3 /app/worker/provision_free_tier_retry.py \
   --ssh-key-file "${SSH_KEY_FILE}" \
   --retry-seconds "${RETRY_SECONDS}" \
   --max-attempts "${MAX_ATTEMPTS}" \
-  --vm-profile-file "${VM_PROFILE_FILE}"
+  --profile-defaults-file "${VM_PROFILE_FILE}"
 
 rc=$?
 if [[ $rc -eq 0 ]]; then
